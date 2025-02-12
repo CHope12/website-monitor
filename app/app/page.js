@@ -43,41 +43,46 @@ export default function Page() {
           bgColor="bg-red-200" 
           href="/app/security" 
         />
-        {/* Uptime */}
-        <Card 
-          title="Uptime Monitoring" 
-          icon={<MdAccessTime className="w-full h-full text-yellow-500 group-hover:text-yellow-600"/>}
-          bgColor="bg-yellow-200" 
-          href="/app/uptime" 
-        />
-        {/* Traffic */}
-        <Card 
-          title="Traffic Analysis" 
-          icon={<MdTraffic className="w-full h-full text-purple-500 group-hover:text-purple-600"/>}
-          bgColor="bg-purple-200" 
-          href="/app/traffic" 
-        />
-        {/* Competitors */}
-        <Card 
-          title="Competitor Analysis" 
-          icon={<MdCompare className="w-full h-full text-indigo-500 group-hover:text-indigo-600"/>}
-          bgColor="bg-indigo-200" 
-          href="/app/competitors" 
-        />
-        {/* Insights */}
-        <Card 
-          title="Insights & Analytics" 
-          icon={<MdInsights className="w-full h-full text-teal-500 group-hover:text-teal-600"/>} 
-          bgColor="bg-teal-200" 
-          href="/app/insights" 
-        />
         {/* Accessibility */}
         <Card 
           title="Accessibility Improvements" 
           icon={<MdAccessibility className="w-full h-full text-pink-500 group-hover:text-pink-600"/>} 
           bgColor="bg-pink-200" 
           href="/app/accessibility" 
-        />        
+        />
+
+        <div className="w-full flex justify-start items-center mt-12">
+          <p className="text-xl font-semibold tracking-tight px-8">Coming Soon</p>
+        </div>
+
+        {/* Traffic */}        
+        <Card           
+          title="Traffic Analysis" 
+          icon={<MdTraffic className="w-full h-full text-purple-500 group-hover:text-purple-600"/>}
+          bgColor="bg-purple-200" 
+          href="/app/" 
+        />
+        {/* Competitors */}
+        <Card 
+          title="Competitor Analysis" 
+          icon={<MdCompare className="w-full h-full text-indigo-500 group-hover:text-indigo-600"/>}
+          bgColor="bg-indigo-200" 
+          href="/app/" 
+        />
+        {/* Insights */}
+        <Card 
+          title="Insights & Analytics" 
+          icon={<MdInsights className="w-full h-full text-teal-500 group-hover:text-teal-600"/>} 
+          bgColor="bg-teal-200" 
+          href="/app/" 
+        />
+        {/* Uptime */}
+        <Card 
+          title="Uptime Monitoring" 
+          icon={<MdAccessTime className="w-full h-full text-yellow-500 group-hover:text-yellow-600"/>}
+          bgColor="bg-yellow-200" 
+          href="/app/" 
+        />
       </div>
     </>
   )

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { MdMonitorHeart } from "react-icons/md";
 import { FaArrowRight } from "react-icons/fa";
 import { GoArrowUpRight } from "react-icons/go";
