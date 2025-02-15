@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button"
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from '@/components/ui/table';
 import LighthouseCard from "@/components/app/LighthouseCard";
 
-import { useDataContext } from "../data-provider";
+import { useDataContext } from "../../../components/data-provider";
 import { FaSquare } from "react-icons/fa";
 
   
@@ -100,7 +100,7 @@ export default function Page() {
   
 
   useEffect(() => {
-    if (!loading && lighthouseData && lighthouseData.data.report){      
+    if (!loading && lighthouseData && lighthouseData.data && lighthouseData.data.report){      
       // Set performance metrics make sure values are not null      
       const performance = lighthouseData.data.report.performance;
       setPerformanceMetrics({
@@ -140,13 +140,8 @@ export default function Page() {
       });      
     }
   }, [lighthouseData]);
-
-  if (loading) return (  
-    <div className="w-full h-[66vh] flex flex-col justify-center items-center gap-4">
-      <div className="w-20 h-20 border-8 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>      
-      <p className="text-sm text-gray-700">Make sure you have set a website.</p>
-    </div>
-  );
+  
+  if (loading) return null;
 
   return(
     <div className="max-w-7xl">
@@ -260,13 +255,13 @@ export default function Page() {
         {/* Map each score metric with score < 1 */}
         <WideTallCard className="h-auto">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold py-4">Areas for improvement:</h2>
+            <h2 className="text-xl font-semibold py-4">Potential issues:</h2>
             <div className="flex flex justify-center items-center gap-8">
               <span className="font-semibold">Priority:</span> 
               <div className="flex-col gap-4">
-                <span className="flex justify-end items-center gap-2">Low <FaSquare className="text-green-300"/></span>
-                <span className="flex justify-end items-center gap-2">Medium <FaSquare className="text-yellow-300"/></span>
-                <span className="flex justify-end items-center gap-2">High <FaSquare className="text-red-300"/></span>
+                <span className="flex justify-end items-center gap-2">Low <FaSquare className="text-yellow-400"/></span>
+                <span className="flex justify-end items-center gap-2">Medium <FaSquare className="text-orange-400"/></span>
+                <span className="flex justify-end items-center gap-2">High <FaSquare className="text-red-400"/></span>
               </div>
             </div>
           </div>
@@ -292,7 +287,7 @@ export default function Page() {
                 return (
                   <TableRow 
                     key={key}
-                    className={`bg-${metric.score > .89 ? "green" : metric.score > .49 ? "yellow" : "red"}-200`}
+                    className={`bg-${metric.score > .89 ? "yellow" : metric.score > .49 ? "orange" : "red"}-200`}
                   >
                     <TableCell>
                       {key.toUpperCase()}

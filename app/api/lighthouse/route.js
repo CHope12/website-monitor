@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { getServerSession } from "next-auth";
+import { auth0 } from "@/lib/auth0";
 import { exec } from "child_process";
 import path from "path";
 import fs, { access } from "fs";
@@ -528,16 +527,19 @@ async function runLighthouseTest(url) {
         return;
       }
 
-      //save the data to the file
+      /*save the data to the file
       fs.writeFile("lighthouse-report.json", stdout, function(err) {
         if (err) {
           console.log(err);
         }
       });
+      */
 
       try {
         const lighthouseData = JSON.parse(stdout);
+        resolve(lighthouseData);
 
+        /*
         const SEOAudits = lighthouseData.categories["seo"].auditRefs.map(audit => audit.id);
         const SEOAuditsData = SEOAudits.map(audit => {
           return {
@@ -691,6 +693,7 @@ async function runLighthouseTest(url) {
         };
 
         resolve(report);
+        */
       } catch (parseError) {
         console.error("JSON Parse Error:", parseError);
         console.error("Raw stdout:", stdout);
@@ -701,39 +704,527 @@ async function runLighthouseTest(url) {
   });
 }
 
-const userId = 123;
+import clientPromise from '@/lib/mongodb';
+
+/*
+export async function POST(req) {
+  try {
+    const session = await auth0.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("myDatabase");
+
+    const { url } = await req.json();
+    if (!url) {
+      return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    }
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendUpdate = (message) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message })}\n\n`));
+        };
+
+        sendUpdate("Checking for existing report...");
+
+        const existingReport = await db.collection("lighthouse").findOne({ url });
+
+        if (existingReport) {
+          sendUpdate("Report found in cache, retrieving...");
+          
+          // Add website to user's websites
+          sendUpdate("Updating user websites...");
+          const userResult = await db.collection("userWebsites").findOne({ userId: session.user.sub });
+          if (userResult) {
+            await db.collection("userWebsites").updateOne(
+              { userId: session.user.sub },
+              { $addToSet: { websites: url } }
+            );
+          } else {
+            await db.collection("userWebsites").insertOne({
+              userId: session.user.sub,
+              websites: [url],
+            });
+          }
+
+          sendUpdate("Report successfully retrieved.");
+          controller.close();
+          return;
+        }
+
+        sendUpdate("No existing report found, running tests...");
+
+        sendUpdate("Extracting links & checking broken links...");
+        const { links, brokenLinks } = await getAllAndCheckBrokenLinks(url);
+        sendUpdate("Links checked successfully.");
+
+        sendUpdate("Checking SSL Certificate...");
+        const sslCertificate = await checkSSLCertificate(url);
+        sendUpdate("SSL check completed.");
+
+        sendUpdate("Checking security headers...");
+        const securityHeaders = await checkSecurityHeaders(url);
+        sendUpdate("Security headers check completed.");
+
+        sendUpdate("Running malware scan...");
+        const malware = await checkMalware(url);
+        sendUpdate("Malware check completed.");
+
+        sendUpdate("Checking firewall, software & WCAG compliance...");
+        const firewallSoftwareWCAG = await checkFirewallSoftwareWCAG(url);
+        sendUpdate("Firewall and software analysis completed.");
+        const firewall = firewallSoftwareWCAG.waf_detection;
+        const software = firewallSoftwareWCAG.technology_analysis;
+        const wcag = firewallSoftwareWCAG.wcag_compliance;
+        const wcagGrade = gradeWCAGCompliance(wcag);
+
+        sendUpdate("Checking open ports...");
+        const openPorts = await checkOpenPorts(url);
+        sendUpdate("Open ports scan completed.");
+
+        sendUpdate("Checking broken media (images, videos, audio)...");
+        const { mediaElements, brokenMedia } = await checkBrokenMedia(url);
+        sendUpdate("Broken media check completed.");
+
+        sendUpdate("Analyzing page readability...");
+        const fleschKincaid = await analyzePageReadability(url);
+        sendUpdate("Readability analysis completed.");
+
+        sendUpdate("Running Lighthouse audit...");
+        const lighthouseData = await runLighthouseTest(url);
+        sendUpdate("Lighthouse audit completed.");
+
+        sendUpdate("Saving report to database...");
+        
+        const SEOAudits = lighthouseData.categories["seo"].auditRefs.map(audit => audit.id);
+        const SEOAuditsData = SEOAudits.map(audit => ({
+          id: audit,
+          title: lighthouseData.audits[audit].title,
+          description: lighthouseData.audits[audit].description,
+          score: lighthouseData.audits[audit].score,
+        }));
+
+        const bestPracticesAudits = lighthouseData.categories["best-practices"].auditRefs.map(audit => audit.id);
+        const bestPracticesAuditsData = bestPracticesAudits.map(audit => ({
+          id: audit,
+          title: lighthouseData.audits[audit].title,
+          description: lighthouseData.audits[audit].description,
+          score: lighthouseData.audits[audit].score,
+        }));
+
+        const accessibilityAudits = lighthouseData.categories["accessibility"].auditRefs.map(audit => audit.id);
+        const accessibilityAuditsData = accessibilityAudits.map(audit => ({
+          id: audit,
+          title: lighthouseData.audits[audit].title,
+          description: lighthouseData.audits[audit].description,
+          score: lighthouseData.audits[audit].score,
+        }));
+
+        const altTextAudits = [
+          lighthouseData.audits["image-alt"],
+          lighthouseData.audits["input-image-alt"],
+          lighthouseData.audits["image-redundant-alt"],
+        ];
+
+        const validAltTextScores = altTextAudits
+          .map(audit => audit.score)
+          .filter(score => score !== null && score !== undefined);
+
+        const altTextScore = validAltTextScores.length > 0
+          ? validAltTextScores.reduce((a, b) => a + b, 0) / validAltTextScores.length
+          : 0;
+
+        const ariaLabelAudits = [
+          lighthouseData.audits["aria-allowed-attr"],
+          lighthouseData.audits["aria-allowed-role"],
+          lighthouseData.audits["aria-command-name"],
+          lighthouseData.audits["aria-conditional-attr"],
+          lighthouseData.audits["aria-deprecated-role"],
+          lighthouseData.audits["aria-dialog-name"],
+          lighthouseData.audits["aria-hidden-body"],
+          lighthouseData.audits["aria-hidden-focus"],
+          lighthouseData.audits["aria-input-field-name"],
+          lighthouseData.audits["aria-meter-name"],
+          lighthouseData.audits["aria-progressbar-name"],
+          lighthouseData.audits["aria-prohibited-attr"],
+          lighthouseData.audits["aria-required-attr"],
+          lighthouseData.audits["aria-required-children"],
+          lighthouseData.audits["aria-required-parent"],
+          lighthouseData.audits["aria-roles"],
+          lighthouseData.audits["aria-text"],
+          lighthouseData.audits["aria-toggle-field-name"],
+          lighthouseData.audits["aria-tooltip-name"],
+          lighthouseData.audits["aria-treeitem-name"],
+          lighthouseData.audits["aria-valid-attr-value"],
+          lighthouseData.audits["aria-valid-attr"],
+        ];
+                
+        const validAriaScores = ariaLabelAudits
+          .map(audit => audit.score)
+          .filter(score => score !== null && score !== undefined);
+        
+        const ariaLabelScore = validAriaScores.length > 0 
+          ? validAriaScores.reduce((a, b) => a + b, 0) / validAriaScores.length
+          : 0;
+
+        const report = {
+          performance: {
+            ttfb: {
+              value: lighthouseData.audits["server-response-time"]?.numericValue || null,
+              score: lighthouseData.audits["server-response-time"]?.score || null,
+            },
+            fcp: {
+              value: lighthouseData.audits["first-contentful-paint"]?.numericValue || null,
+              score: lighthouseData.audits["first-contentful-paint"]?.score || null,
+            },
+            lcp: {
+              value: lighthouseData.audits["largest-contentful-paint"]?.numericValue || null,
+              score: lighthouseData.audits["largest-contentful-paint"]?.score || null,
+            },
+            cls: {
+              value: lighthouseData.audits["cumulative-layout-shift"]?.numericValue || null,
+              score: lighthouseData.audits["cumulative-layout-shift"]?.score || null,
+            },
+            tbt: {
+              value: lighthouseData.audits["total-blocking-time"]?.numericValue || null,
+              score: lighthouseData.audits["total-blocking-time"]?.score || null,
+            },
+            speedIndex: {
+              value: lighthouseData.audits["speed-index"]?.numericValue || null,
+              score: lighthouseData.audits["speed-index"]?.score || null,
+            },
+            tti: {
+              value: lighthouseData.audits["interactive"]?.numericValue || null,
+              score: lighthouseData.audits["interactive"]?.score || null,
+            },
+            js_blocking_time: {
+              value: lighthouseData.audits["bootup-time"]?.numericValue || null,
+              score: lighthouseData.audits["bootup-time"]?.score || null,
+            },
+            score: lighthouseData.categories.performance.score * 100,
+          },
+
+          seo: {
+            audits: SEOAuditsData,
+            links,
+            brokenLinks,
+            score: lighthouseData.categories.seo.score * 100,
+          },
+
+          best_practices: {
+            audits: bestPracticesAuditsData,
+            sslCertificate,
+            securityHeaders: lighthouseData.audits["csp-xss"]?.details || "No CSP or X-XSS-Protection header found",
+            securityHeadersInfo: securityHeaders,
+            malware,
+            firewall,
+            software,
+            openPorts,
+            score: lighthouseData.categories["best-practices"].score * 100,
+          },
+
+          accessibility: {
+            audits: accessibilityAuditsData,
+            viewport: lighthouseData.audits["viewport"]?.score,
+            altTextScore,
+            ariaLabelScore,
+            colorContrast: lighthouseData.audits["color-contrast"],
+            mediaElements,
+            brokenMedia,
+            fontReadability: lighthouseData.audits["font-size"]?.score,
+            wcag,
+            wcagGrade,
+            fleschKincaid,
+            score: lighthouseData.categories.accessibility.score * 100,
+          },
+        };
+
+        await db.collection("lighthouse").insertOne({
+          url,
+          report,
+          createdAt: new Date(),
+        });
+
+        sendUpdate("Report saved to database.");
+        sendUpdate("Audit successfully completed.");
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ report })}\n\n`));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
+  }
+}
+*/
 
 export async function POST(req) {
   try {
-    /*
-    const session = await getServerSession();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    */
-
     const { url } = await req.json();
-    if (!url) return NextResponse.json({ error: "URL is required" }, { status: 400 });
-
-    const { db } = await connectToDatabase();
-
-    // Check if a Lighthouse report already exists for this URL
-    const existingReport = await db.collection("lighthouse").findOne({ userId: userId, url });
-
-    if (existingReport) {
-      return NextResponse.json({ message: "Report fetched from cache", data: existingReport });
+    if (!url) {
+      return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // Run Lighthouse test if no report exists
-    const lighthouseReport = await runLighthouseTest(url);
+    const session = await auth0.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    // Save report to MongoDB
-    const result = await db.collection("lighthouse").insertOne({
-      userId: userId,
-      url,
-      report: lighthouseReport,
-      createdAt: new Date(), // Required for TTL index
+    // Check if the audit exists in the database
+    const client = await clientPromise;
+    const db = client.db("myDatabase");
+    const existingReport = await db.collection("lighthouse").findOne({ url });
+    if (existingReport) {
+      return NextResponse.json({ message: "Report fetched from cache", data: existingReport });
+    } else {
+      // Start the audit and store the URL for SSE retrieval      
+      global.currentAuditURL = url;
+      return NextResponse.json({ message: "Audit started. Now connect via SSE (GET request)." });
+    }            
+  } catch (error) {
+    console.error("Error:", error);
+    return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
+  }
+}
+
+// Handle GET requests for real-time updates (SSE)
+export async function GET(req) {
+  try {
+    if (!global.currentAuditURL) {
+      return NextResponse.json({ error: "No active audit found. Start one with POST." }, { status: 400 });
+    }
+
+    const url = global.currentAuditURL;
+    const client = await clientPromise;
+    const db = client.db("myDatabase");
+
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const sendUpdate = (message) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ message })}\n\n`));
+        };        
+
+        sendUpdate("No existing report found, running tests...");
+
+        sendUpdate("Extracting links & checking broken links...");
+        const { links, brokenLinks } = await getAllAndCheckBrokenLinks(url);
+        sendUpdate("Links checked successfully.");
+
+        sendUpdate("Checking SSL Certificate...");
+        const sslCertificate = await checkSSLCertificate(url);
+        sendUpdate("SSL check completed.");
+
+        sendUpdate("Checking security headers...");
+        const securityHeaders = await checkSecurityHeaders(url);
+        sendUpdate("Security headers check completed.");
+
+        sendUpdate("Running malware scan...");
+        const malware = await checkMalware(url);
+        sendUpdate("Malware check completed.");
+
+        sendUpdate("Checking firewall, software & WCAG compliance...");
+        const firewallSoftwareWCAG = await checkFirewallSoftwareWCAG(url);
+        sendUpdate("Firewall and software analysis completed.");
+        const firewall = firewallSoftwareWCAG.waf_detection;
+        const software = firewallSoftwareWCAG.technology_analysis;
+        const wcag = firewallSoftwareWCAG.wcag_compliance;
+        const wcagGrade = gradeWCAGCompliance(wcag);
+
+        sendUpdate("Checking open ports...");
+        const openPorts = await checkOpenPorts(url);
+        sendUpdate("Open ports scan completed.");
+
+        sendUpdate("Checking broken media (images, videos, audio)...");
+        const { mediaElements, brokenMedia } = await checkBrokenMedia(url);
+        sendUpdate("Broken media check completed.");
+
+        sendUpdate("Analyzing page readability...");
+        const fleschKincaid = await analyzePageReadability(url);
+        sendUpdate("Readability analysis completed.");
+
+        sendUpdate("Running Lighthouse audit...");
+        const lighthouseData = await runLighthouseTest(url);
+        sendUpdate("Lighthouse audit completed.");
+
+        sendUpdate("Saving report to database...");
+        
+        const SEOAudits = lighthouseData.categories["seo"].auditRefs.map(audit => audit.id);
+        const SEOAuditsData = SEOAudits.map(audit => ({
+          id: audit,
+          title: lighthouseData.audits[audit].title,
+          description: lighthouseData.audits[audit].description,
+          score: lighthouseData.audits[audit].score,
+        }));
+
+        const bestPracticesAudits = lighthouseData.categories["best-practices"].auditRefs.map(audit => audit.id);
+        const bestPracticesAuditsData = bestPracticesAudits.map(audit => ({
+          id: audit,
+          title: lighthouseData.audits[audit].title,
+          description: lighthouseData.audits[audit].description,
+          score: lighthouseData.audits[audit].score,
+        }));
+
+        const accessibilityAudits = lighthouseData.categories["accessibility"].auditRefs.map(audit => audit.id);
+        const accessibilityAuditsData = accessibilityAudits.map(audit => ({
+          id: audit,
+          title: lighthouseData.audits[audit].title,
+          description: lighthouseData.audits[audit].description,
+          score: lighthouseData.audits[audit].score,
+        }));
+
+        const altTextAudits = [
+          lighthouseData.audits["image-alt"],
+          lighthouseData.audits["input-image-alt"],
+          lighthouseData.audits["image-redundant-alt"],
+        ];
+
+        const validAltTextScores = altTextAudits
+          .map(audit => audit.score)
+          .filter(score => score !== null && score !== undefined);
+
+        const altTextScore = validAltTextScores.length > 0
+          ? validAltTextScores.reduce((a, b) => a + b, 0) / validAltTextScores.length
+          : 0;
+
+        const ariaLabelAudits = [
+          lighthouseData.audits["aria-allowed-attr"],
+          lighthouseData.audits["aria-allowed-role"],
+          lighthouseData.audits["aria-command-name"],
+          lighthouseData.audits["aria-conditional-attr"],
+          lighthouseData.audits["aria-deprecated-role"],
+          lighthouseData.audits["aria-dialog-name"],
+          lighthouseData.audits["aria-hidden-body"],
+          lighthouseData.audits["aria-hidden-focus"],
+          lighthouseData.audits["aria-input-field-name"],
+          lighthouseData.audits["aria-meter-name"],
+          lighthouseData.audits["aria-progressbar-name"],
+          lighthouseData.audits["aria-prohibited-attr"],
+          lighthouseData.audits["aria-required-attr"],
+          lighthouseData.audits["aria-required-children"],
+          lighthouseData.audits["aria-required-parent"],
+          lighthouseData.audits["aria-roles"],
+          lighthouseData.audits["aria-text"],
+          lighthouseData.audits["aria-toggle-field-name"],
+          lighthouseData.audits["aria-tooltip-name"],
+          lighthouseData.audits["aria-treeitem-name"],
+          lighthouseData.audits["aria-valid-attr-value"],
+          lighthouseData.audits["aria-valid-attr"],
+        ];
+                
+        const validAriaScores = ariaLabelAudits
+          .map(audit => audit.score)
+          .filter(score => score !== null && score !== undefined);
+        
+        const ariaLabelScore = validAriaScores.length > 0 
+          ? validAriaScores.reduce((a, b) => a + b, 0) / validAriaScores.length
+          : 0;
+
+        const report = {
+          performance: {
+            ttfb: {
+              value: lighthouseData.audits["server-response-time"]?.numericValue || null,
+              score: lighthouseData.audits["server-response-time"]?.score || null,
+            },
+            fcp: {
+              value: lighthouseData.audits["first-contentful-paint"]?.numericValue || null,
+              score: lighthouseData.audits["first-contentful-paint"]?.score || null,
+            },
+            lcp: {
+              value: lighthouseData.audits["largest-contentful-paint"]?.numericValue || null,
+              score: lighthouseData.audits["largest-contentful-paint"]?.score || null,
+            },
+            cls: {
+              value: lighthouseData.audits["cumulative-layout-shift"]?.numericValue || null,
+              score: lighthouseData.audits["cumulative-layout-shift"]?.score || null,
+            },
+            tbt: {
+              value: lighthouseData.audits["total-blocking-time"]?.numericValue || null,
+              score: lighthouseData.audits["total-blocking-time"]?.score || null,
+            },
+            speedIndex: {
+              value: lighthouseData.audits["speed-index"]?.numericValue || null,
+              score: lighthouseData.audits["speed-index"]?.score || null,
+            },
+            tti: {
+              value: lighthouseData.audits["interactive"]?.numericValue || null,
+              score: lighthouseData.audits["interactive"]?.score || null,
+            },
+            js_blocking_time: {
+              value: lighthouseData.audits["bootup-time"]?.numericValue || null,
+              score: lighthouseData.audits["bootup-time"]?.score || null,
+            },
+            score: lighthouseData.categories.performance.score * 100,
+          },
+
+          seo: {
+            audits: SEOAuditsData,
+            links,
+            brokenLinks,
+            score: lighthouseData.categories.seo.score * 100,
+          },
+
+          best_practices: {
+            audits: bestPracticesAuditsData,
+            sslCertificate,
+            securityHeaders: lighthouseData.audits["csp-xss"]?.details || "No CSP or X-XSS-Protection header found",
+            securityHeadersInfo: securityHeaders,
+            malware,
+            firewall,
+            software,
+            openPorts,
+            score: lighthouseData.categories["best-practices"].score * 100,
+          },
+
+          accessibility: {
+            audits: accessibilityAuditsData,
+            viewport: lighthouseData.audits["viewport"]?.score,
+            altTextScore,
+            ariaLabelScore,
+            colorContrast: lighthouseData.audits["color-contrast"],
+            mediaElements,
+            brokenMedia,
+            fontReadability: lighthouseData.audits["font-size"]?.score,
+            wcag,
+            wcagGrade,
+            fleschKincaid,
+            score: lighthouseData.categories.accessibility.score * 100,
+          },
+        };
+
+        await db.collection("lighthouse").insertOne({
+          url,
+          report,
+          createdAt: new Date(),
+        });
+
+        sendUpdate("Report saved to database.");
+        sendUpdate("Audit successfully completed.");
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ report })}\n\n`));
+        controller.close();
+      },
     });
 
-    return NextResponse.json({ message: "Lighthouse report saved", insertedId: result.insertedId, data: lighthouseReport });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
 
   } catch (error) {
     console.error("Error:", error);

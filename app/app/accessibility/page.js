@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useDataContext } from "../data-provider";
+import { useDataContext } from "../../../components/data-provider";
 
 import LighthouseCard from "@/components/app/LighthouseCard";
 import { Button } from "@/components/ui/Button";
@@ -9,11 +9,13 @@ import Gauge from '@/components/app/Guage';
 
 import ReactMarkdown from "react-markdown";
 
+import { FaSquare } from "react-icons/fa"
+
 
 function WideTallCard({ title, children }) {
   return (
     <div className="w-full bg-white border border-gray-200 rounded-lg shadow-md flex flex-col justify-start px-8 py-4">
-      <h2 className="text-xl font-semibold tracking-tight py-4">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight pb-4">{title}</h2>
       {children}
     </div>
   );
@@ -160,7 +162,7 @@ export default function Page(){
   const { lighthouseData, loading } = useDataContext();
 
   const [accessibilityMetrics, setAccessibilityMetrics] = useState({
-      audits: {},
+      audits: [],
       links: [],
       brokenLinks: [],
       viewport: 0,
@@ -187,7 +189,7 @@ export default function Page(){
         const seo = lighthouseData.data.report.seo;    
                         
         setAccessibilityMetrics({          
-          audits: accessibility.audits || {},
+          audits: accessibility.audits || [],
           links: seo.links || [],
           brokenLinks: seo.brokenLinks || [],          
           viewport: accessibility.viewport || 0,
@@ -358,11 +360,100 @@ export default function Page(){
       </ThinCard>   
 
       
-      {/* Issues */}
-      <WideCard>
-        <h2 className="text-xl font-semibold py-4">Issues:</h2>
-        <p className="text-gray-700">Nothing to see here... your website has no accessibility issues!</p>
-      </WideCard>    
+        {/* Issues */}
+        {/* Map each score metric with score < 1 */}
+        <WideTallCard className="h-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold py-4">Potential Issues:</h2>
+            <div className="flex flex justify-center items-center gap-8">
+              <span className="font-semibold">Priority:</span> 
+              <div className="flex-col gap-4">
+                <span className="flex justify-end items-center gap-2">Low <FaSquare className="text-yellow-400"/></span>
+                <span className="flex justify-end items-center gap-2">Medium <FaSquare className="text-orange-400"/></span>
+                <span className="flex justify-end items-center gap-2">High <FaSquare className="text-red-400"/></span>
+              </div>
+            </div>
+          </div>
+          {/* if any metric is less than 1 show */}          
+          {(accessibilityMetrics.wcag.total_issues > 0) && (
+            <Table>
+              <TableHeader className="bg-[#151515] text-white">
+                <TableRow>
+                  <TableCell>
+                    Description
+                  </TableCell>                  
+                  <TableCell>
+                    Element(s)
+                  </TableCell>
+                  <TableCell>
+                    Impact
+                  </TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {accessibilityMetrics.wcag.violations.map((violation) => (
+                  <TableRow
+                    key={violation.id}
+                    className={`bg-${violation.impact === "moderate" ? "yellow" : violation.impact === "critical" ? "orange" : "red"}-200`}
+                  >
+                    <TableCell>
+                      {violation.description}
+                    </TableCell>
+                    <TableCell>
+                      <ul className="max-h-[200px] overflow-y-scroll">
+                        {violation.elements.map((element, index) => {
+                          return (
+                           <li key={index} className="text-xs"><span className="font-semibold">{index+1}</span>: {element}</li> 
+                          )
+                        })}
+                      </ul>
+                    </TableCell>
+                    <TableCell>
+                      {violation.impact}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}          
+                                
+          {accessibilityMetrics.audits.some(audit => (audit.score < 1) && (audit.score !== null)) ? (
+            <Table>
+              <TableHeader className="bg-[#151515] text-white">
+                <TableRow>
+                  <TableCell>
+                    Metric
+                  </TableCell>                  
+                  <TableCell>
+                    Value/Severity
+                  </TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+            {accessibilityMetrics.audits.map((audit) => {
+              if (audit.score < 1 && audit.score !== null) {
+                return (
+                  <TableRow 
+                    key={audit.id}
+                    className={`bg-${audit.score > .89 ? "green" : audit.score > .49 ? "yellow" : "red"}-200`}
+                  >
+                    <TableCell>
+                      {audit.id}
+                    </TableCell>                    
+                    <TableCell>
+                      {audit.score === null ? "Not found" : "Broken"}
+                    </TableCell>
+                  </TableRow>                    
+                );
+              }
+            })}
+            </TableBody>
+            </Table>
+          ) : ( !(accessibilityMetrics.wcag.total_issues > 0) && (
+          <p className="text-gray-700">Nothing to see here... your website has a perfect score!</p>
+          ))}
+          
+        </WideTallCard> 
         
       </div>
     </div>

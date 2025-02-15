@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useDataContext } from "../data-provider";
+import { useDataContext } from "../../../components/data-provider";
 
 import LighthouseCard from "@/components/app/LighthouseCard";
 import { Button } from "@/components/ui/Button";
@@ -8,10 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from '@
 
 import ReactMarkdown from "react-markdown"
 
+import { FaSquare } from "react-icons/fa"
+
 function WideTallCard({ title, children }) {
   return (
     <div className="w-full bg-white border border-gray-200 rounded-lg shadow-md flex flex-col justify-start px-8 py-4">
-      <h2 className="text-xl font-semibold tracking-tight py-4">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight pb-4">{title}</h2>
       {children}
     </div>
   );
@@ -52,11 +54,11 @@ export default function Page(){
   const { lighthouseData, loading } = useDataContext();
 
   const [securityMetrics, setSecurityMetrics] = useState({
-    audits: {},
+    audits: [],
     sslCertificate: {},
     securityHeaders: {},
     malware: {},
-    firewall: {},
+    firewall: "",
     openPorts: {},
     software: {},
     score: 100,
@@ -68,18 +70,19 @@ export default function Page(){
       console.log("Best Practices: ");
       console.log(best_practices);
       setSecurityMetrics({
-        audits: best_practices.audits || {},
+        audits: best_practices.audits || [],
         sslCertificate: best_practices.sslCertificate || {},
         securityHeaders: best_practices.securityHeaders || {},
         malware: best_practices.malware || {},
-        firewall: best_practices.firewall || {},
+        firewall: best_practices.firewall || "",
         openPorts: best_practices.openPorts || {},
         software: best_practices.software || {},
         score: best_practices.score
       });
-    }
-    console.log("Firewall");
-    console.log(securityMetrics.firewall.result !== undefined && securityMetrics.firewall.result.includes("No WAF detected by the generic detection"));
+
+      console.log(securityMetrics.securityHeaders);
+
+    }    
   }, [lighthouseData]);
 
   if (loading){
@@ -140,12 +143,7 @@ export default function Page(){
         
         <ThinCard>
           <div className="flex justify-between items-center mb-4"><h2 className="font-semibold text-lg tracking-tight">SSL Certificate Check: </h2>✅</div>
-          {/*
-          <p>Cipher Suite: TLS_AES_256_GCM_SHA384</p>
-          <p>Key Exchange: ECDHE_RSA</p>
-          <p>Protocol: TLS 1.3</p>
-          <p>Expiration: 2023-09-01</p>
-          */}
+
           <div className="flex justify-between items-center">
             <p>Domain:</p><p className="w-1/2 text-left font-semibold">{securityMetrics.sslCertificate.domain}</p>
           </div>
@@ -162,20 +160,7 @@ export default function Page(){
             <p>Days Remaining:</p><p className="w-1/2 text-left font-semibold">{securityMetrics.sslCertificate.validDaysRemaining}</p>
           </div>
         </ThinCard>
-        {/*
-        <ThinCard>
-          <div className="flex justify-between items-center mb-4"><h2 className="font-semibold text-lg tracking-tight">Website Firewall Check: </h2>✅</div>          
-          <p>Firewall: Active</p>
-          <p>WAF: Active</p>
-          <p>DDoS Protection: Active</p>          
-        </ThinCard>
-        
-        <ThinCard>
-          <div className="flex justify-between items-center mb-4"><h2 className="font-semibold text-lg tracking-tight">Malware & Phishing Detection: </h2>✅</div>
-          <p>Malware Scanner: Active</p>
-          <p>Phishing Protection: Active</p>          
-        </ThinCard>
-        */}        
+
         <ThinCard>
           <div className="flex justify-between items-center mb-4"><h2 className="font-semibold text-lg tracking-tight">Open Ports & Vulnerability Scan: </h2></div>
           {securityMetrics.openPorts.results && securityMetrics.openPorts.results.length > 0 ? (
@@ -260,15 +245,88 @@ export default function Page(){
         <SmallCard title="Malware & Phishing Detection" scoreStr={securityMetrics.malware == {} ? "❌" : "✅"} score={securityMetrics.malware == {} ? 0 : 100} textValue={["No Malware Detected", "Malware Detected."]}/>
         <SmallCard 
           title="Web Application Firewall (WAF)"
-          scoreStr={securityMetrics.firewall.result !== undefined ? (securityMetrics.firewall.result.includes("No WAF detected by the generic detection") ? "❌" : "✅") : "❌"} 
-          score={securityMetrics.firewall.result !== undefined ? (securityMetrics.firewall.result.includes("No WAF detected by the generic detection") ? 0 : 100) : 0} 
+          scoreStr={securityMetrics.firewall !== ("" || undefined) ? (securityMetrics.firewall?.includes("No WAF detected") ? "❌" : "✅") : "❌"} 
+          score={securityMetrics.firewall !== ("" || undefined) ? (securityMetrics.firewall?.includes("No WAF detected") ? 0 : 100) : 0} 
           textValue={["Not Detected", "Firewall Active"]}/>
         
         {/* Issues */}
-        <WideCard>
-          <h2 className="text-xl font-semibold py-4">Issues:</h2>
-          <p className="text-gray-700">Nothing to see here... your website has no vulnerabilties!</p>
-        </WideCard>    
+        {/* Map each score metric with score < 1 */}
+        <WideTallCard className="h-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold py-4">Potential Issues:</h2>
+            <div className="flex flex justify-center items-center gap-8">
+              <span className="font-semibold">Priority:</span> 
+              <div className="flex-col gap-4">
+                <span className="flex justify-end items-center gap-2">Low <FaSquare className="text-yellow-400"/></span>
+                <span className="flex justify-end items-center gap-2">Medium <FaSquare className="text-orange-400"/></span>
+                <span className="flex justify-end items-center gap-2">High <FaSquare className="text-red-400"/></span>
+              </div>
+            </div>
+          </div>
+          {/* if any metric is less than 1 show */}
+          {securityMetrics.audits.some(audit => audit.score < 1) ? (
+            <Table>
+              <TableHeader className="bg-[#151515] text-white">
+                <TableRow>
+                  <TableCell>
+                    Metric
+                  </TableCell>                  
+                  <TableCell>
+                    Value/Severity
+                  </TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+            {securityMetrics.audits.map((audit) => {
+              if (audit.score < 1) {
+                return (
+                  <TableRow 
+                    key={audit.id}
+                    className={`bg-${audit.score > .89 ? "yellow" : audit.score > .49 ? "orange" : "red"}-200`}
+                  >
+                    <TableCell>
+                      {audit.id}
+                    </TableCell>                    
+                    <TableCell>
+                      {audit.score === null ? "Not found" : "Broken"}
+                    </TableCell>
+                  </TableRow>                    
+                );
+              }
+            })}
+            {securityMetrics.securityHeaders.items?.map((header) => {
+              return (
+                <TableRow
+                  key={header}
+                  className={`bg-${header.severity === "High" ? "red" : header.severity === "medium" ? "orange" : "yellow"}-200`}
+                >
+                  <TableCell>
+                    {header.description}
+                  </TableCell>                  
+                  <TableCell>
+                    {header.severity}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+
+            {securityMetrics.firewall !== ("" || undefined) && securityMetrics.firewall?.includes("No WAF detected") && (
+              <TableRow className="bg-red-200">
+                <TableCell>
+                  Firewall Not Detected
+                </TableCell>
+                <TableCell>
+                  High
+                </TableCell>
+              </TableRow>
+            )}
+            </TableBody>
+            </Table>
+          ) : (
+          <p className="text-gray-700">Nothing to see here... your website has a perfect score!</p>
+          )}
+          
+        </WideTallCard>
         
       </div>
     </div>

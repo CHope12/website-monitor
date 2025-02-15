@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useDataContext } from "../data-provider";
+import { useDataContext } from "../../../components/data-provider";
 
 import LighthouseCard from "@/components/app/LighthouseCard";
 import { Button } from "@/components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableRow, TableHeader } from '@/components/ui/table';
 
 import ReactMarkdown from "react-markdown"
+
+import { FaSquare } from "react-icons/fa"
 
 function WideCard({ title, children, bgColor = "bg-white" }) {
   return (
@@ -20,7 +22,7 @@ function WideCard({ title, children, bgColor = "bg-white" }) {
 function WideTallCard({ title, children }) {
   return (
     <div className="w-full bg-white border border-gray-200 rounded-lg shadow-md flex flex-col justify-start px-8 py-4">
-      <h2 className="text-xl font-semibold tracking-tight py-4">{title}</h2>
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {children}
     </div>
   );
@@ -54,16 +56,8 @@ export default function Page() {
   
     const [SEOMetrics, setSEOMetrics] = useState({
       audits: [],
-      links: [
-        "https://example.com/link-1",
-        "https://example.com/link-2",
-      ],
-      brokenLinks: [
-        {
-          url: "https://example.com/broken-link-1", 
-          status: 404,
-        },
-      ],
+      links: [],
+      brokenLinks: [],
       score: 0,
     });
   
@@ -74,11 +68,15 @@ export default function Page() {
         setSEOMetrics({
           audits: SEO.audits || [],
           links: SEO.links || [],
-          brokenLinks: SEO.brokenLinks || [],
+          brokenLinks: SEO.brokenLinks || [],          
           score: SEO.score || 0,
         });      
       }
     }, [lighthouseData]);
+
+    useEffect(() => {      
+      console.log(SEOMetrics.audits);
+    }, [SEOMetrics])
   
     if (loading) return (  
       <div className="w-full h-[66vh] flex flex-col justify-center items-center gap-4">
@@ -171,18 +169,94 @@ export default function Page() {
         </ThinCard>
 
 
-        {/* Small Cards 
-        <SmallCard title="Broken Links:" scoreStr={SEOMetrics.brokenLinks.length} score={SEOMetrics.brokenLinks.length === 0 ? 1 : 0} textValue={["Found", "Perfect!"]}/>
-        <SmallCard title="XML Sitemap" scoreStr={SEOMetrics.sitemap.score === 1 ? "✅" : "❌"} score={SEOMetrics.sitemap.score}  textValue={["Missing", "Valid"]}/>
-        <SmallCard title="Robots.txt" scoreStr={SEOMetrics.robots.score === 1 ? "✅" : "❌"} score={SEOMetrics.robots.score}  textValue={["Missing", "Valid"]}/>
-        <SmallCard title="Schema Markup" scoreStr={SEOMetrics.structuredDataValid.score === 1 ? "✅" : "❌"} score={SEOMetrics.structuredDataValid.score}  textValue={["Missing", "Valid"]}/>
-        */}
+        {/* Small Cards */}
+        <SmallCard 
+          title="Broken Links:" 
+          scoreStr={SEOMetrics.brokenLinks.length} 
+          score={SEOMetrics.brokenLinks.length === 0 ? 1 : 0} 
+          textValue={["Found", "Perfect!"]}
+        />
+        {/* <SmallCard title="XML Sitemap" scoreStr={SEOMetrics.audits.sitemap.score === 1 ? "✅" : "❌"} score={SEOMetrics.sitemap.score}  textValue={["Missing", "Valid"]}/> */}
+        
+        <SmallCard 
+          title="Robots.txt" 
+          scoreStr={SEOMetrics.audits.find(audit => audit.id === "robots-txt")?.score === 1 ? "✅" : "❌"} 
+          score={SEOMetrics.audits.find(audit => audit.id === "robots-txt")?.score || 0}
+          textValue={["Missing", "Valid"]}
+        />
+        <SmallCard 
+          title="Schema Markup" 
+          scoreStr={SEOMetrics.audits.find(audit => audit.id === "structured-data")?.score === 1 ? "✅" : "❌"}
+          score={SEOMetrics.audits.find(audit => audit.id === "structured-data")?.score || 0}
+          textValue={["Missing", "Valid"]}
+        />        
 
         {/* Issues */}
-        <WideCard>
-          <h2 className="text-xl font-semibold py-4">Issues:</h2>
-          <p className="text-gray-700">Nothing to see here... your website has a perfect SEO score!</p>
-        </WideCard>
+        {/* Map each score metric with score < 1 */}
+        <WideTallCard className="h-auto">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold py-4">Potential Issues:</h2>
+            <div className="flex flex justify-center items-center gap-8">
+              <span className="font-semibold">Priority:</span> 
+              <div className="flex-col gap-4">
+                <span className="flex justify-end items-center gap-2">Low <FaSquare className="text-yellow-400"/></span>
+                <span className="flex justify-end items-center gap-2">Medium <FaSquare className="text-orange-400"/></span>
+                <span className="flex justify-end items-center gap-2">High <FaSquare className="text-red-400"/></span>
+              </div>
+            </div>
+          </div>
+          {/* if any metric is less than 1 show */}
+          {SEOMetrics.audits.some(audit => audit.score < 1) ? (
+            <Table>
+              <TableHeader className="bg-[#151515] text-white">
+                <TableRow>
+                  <TableCell>
+                    Metric
+                  </TableCell>                  
+                  <TableCell>
+                    Score/Value
+                  </TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+            {SEOMetrics.audits.map((audit) => {
+              if (audit.score < 1) {
+                return (
+                  <TableRow 
+                    key={audit.id}
+                    className={`bg-${audit.score > .89 ? "yellow" : audit.score > .49 ? "orange" : "red"}-200`}
+                  >
+                    <TableCell>
+                      {audit.id}
+                    </TableCell>                    
+                    <TableCell>
+                      {audit.score === null ? "Not found" : "Broken"}
+                    </TableCell>
+                  </TableRow>                    
+                );
+              }
+            })}
+            {SEOMetrics.brokenLinks.map((link) => {
+              return (
+                <TableRow
+                  key={link.url}
+                >
+                  <TableCell>
+                    Broken Link
+                  </TableCell>                  
+                  <TableCell>
+                    {link.url}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+            </TableBody>
+            </Table>     
+          ) : (                                               
+          <p className="text-gray-700">Nothing to see here... your website has a perfect score!</p>                   
+          )}
+          
+        </WideTallCard>  
 
         {/* SERP Position Tracking
         <WideTallCard title="Keyword Rank Tracking">

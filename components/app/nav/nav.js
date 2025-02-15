@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 
 import { MdMonitorHeart } from "react-icons/md"
 import { FaUser, FaCog } from "react-icons/fa";
 
 import { cn } from "@/lib/utils"
-//import { Icons } from "@/components/icons"
+
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -58,25 +59,32 @@ const components = [
   },
 ]
 
-const websites = [
-  {
-    website: "https://www.monitorly.ai",
-    label: "Monitorly.ai",
-  },
-  {
-    website: "https://www.hopzag.co.uk",
-    label: "Hopzag.co.uk",
-  },
-  {
-    website: "https://www.shadcn.com",
-    label: "Shadcn.com",
-  },
-]
-
 export function NavigationMenuApp({ onWebsiteChange }) {
+
+  const [websites, setWebsites] = useState([]);
+
+  useEffect(() => {
+    async function fetchWebsites() {
+      const res = await fetch("/api/websites", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      })      
+      const data = await res.json();      
+      if (data.websites){
+        setWebsites(data.websites);
+      }      
+    }
+
+    fetchWebsites();
+  }, [])
+
 
   const handleWebsiteChange = (website) => {    
     onWebsiteChange(website)
+  }
+
+  const handleWebsiteRemove = (website) => {
+    setWebsites(websites.filter((w) => w !== website))
   }
 
   return (
@@ -337,7 +345,7 @@ export function NavigationMenuApp({ onWebsiteChange }) {
         </NavigationMenu>
       </div>
         <div className="flex h-full items-center pr-8 gap-4 justify-end">            
-          <Combobox websites={websites} onChange={handleWebsiteChange}/>
+          <Combobox websites={websites} onChange={handleWebsiteChange} onRemove={handleWebsiteRemove}/>
           <div className="ml-4 w-10 h-10 bg-gray-100 rounded-full p-3 cursor-pointer hover:bg-gray-200 transition-colors duration-300">
             <FaCog className="w-full h-full text-gray-700" />
           </div>
